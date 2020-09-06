@@ -31,15 +31,17 @@ class LdapServer:
     def __init__(self, uri):
         self.uri = uri
 
-    def csn(self, suffix, sid):
+    # gets the csn of the base DSE for the given suffix and provider serverID
+    def get_csn(self, suffix, sid):
         with LdapReader(self.uri) as conn:
             result = conn.search_s(suffix, ldap.SCOPE_BASE, attrlist=['contextCSN'])
-            contextCSNs = [ x.decode() for x in  result[0][1]['contextCSN'] ]
+            contextCSNs = [ x.decode() for x in result[0][1]['contextCSN'] ]
             for contextCSN in contextCSNs:
                 m = self.RE_CSN.match(contextCSN)
                 # sid in contextCSN is hex
                 if int(m.group('sid'),16) != sid: continue
                 csn = parser.parse(m.group('timestamp') + m.group('timezone'))
+                break
         return(csn)
 
     def get_backends(self):
@@ -75,29 +77,24 @@ class LdapProvider(LdapServer):
 
     def get_peers(self):
         serverids = [ (sid, self.host2uri(uri)) for (sid, uri) in self.serverid_list() ]
-        peers = set([ host for (sid,host) in serverids if not host == self.FQDN ])
-        return peers
+        return set( [ host for (sid,host) in serverids if host != self.FQDN ] )
 
-    def csn(self, suffix):
-        return super().csn(suffix,self.id)
+    def get_csn(self, suffix):
+        return super().get_csn(suffix,self.id)
 
-
-
-master = LdapProvider()
 
 def get_status(consumers):
-    my_consumers = master.peers.union(consumers)
+    my_consumers = provider.peers.union(consumers)
     result = []
-    print(my_consumers)
-    for backend in master.backends:
-        master_csn = master.csn(backend)
+    for backend in provider.backends:
+        master_csn = provider.get_csn(backend)
         for server in my_consumers:
             consumer = LdapServer('ldaps://{}/'.format(server))
             try:
-                # the consumer could be more recent than the master if data is
+                # the consumer could be more recent than the provider if data is
                 # being replicated during this call. Put the delay to 0 in that
                 # case.
-                delay = max( (master_csn - consumer.csn(backend, master.id)).total_seconds() / 3600, 0 )
+                delay = max( (master_csn - consumer.get_csn(backend, provider.id)).total_seconds() / 3600, 0 )
                 result.append({
                     'Channel': '{} - {}'.format(server, backend),
                     'Value': delay,
@@ -105,10 +102,11 @@ def get_status(consumers):
             except ldap.LDAPError:
                 pass
     print(result)
-    return({'delay': result})
+    return {'delay': result}
 
 
+provider = LdapProvider()
 app = connexion.App(__name__)
-app.add_api('swagger/ldapapi.yaml')
+app.add_api('swagger.yaml')
 app.run(port=8080)
 
