@@ -32,7 +32,7 @@ class LdapServer:
         with LdapReader(self.uri) as conn:
             result = conn.search_s(suffix, ldap.SCOPE_BASE, attrlist=['contextCSN'])
         g_contextCSN = ( self.parse_csn(x.decode()) for x in result[0][1]['contextCSN'] )
-        (sid, timestmap) = next(g_contextCSN)
+        (sid, timestamp) = next(g_contextCSN)
         while sid != pid: (sid,timestamp) = next(g_contextCSN)
         return dateparser.parse(timestamp)
 
