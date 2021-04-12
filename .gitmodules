@@ -1,0 +1,3 @@
+[submodule "mockldap"]
+	path = mockldap
+	url = https://github.com/hbog/mockldap.git
