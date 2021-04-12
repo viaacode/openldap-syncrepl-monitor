@@ -31,9 +31,8 @@ class LdapServer:
     def get_csn(self, suffix, pid):
         with LdapReader(self.uri) as conn:
             result = conn.search_s(suffix, ldap.SCOPE_BASE, attrlist=['contextCSN'])
-        g_contextCSN = ( self.parse_csn(x.decode()) for x in result[0][1]['contextCSN'] )
-        (sid, timestamp) = next(g_contextCSN)
-        while sid != pid: (sid,timestamp) = next(g_contextCSN)
+        contextCSNs = [ self.parse_csn(x.decode()) for x in result[0][1]['contextCSN'] ]
+        timestamp = [ t for (s,t) in contextCSNs if s == pid ][0]
         return dateparser.parse(timestamp)
 
     def get_backends(self):
@@ -60,20 +59,18 @@ class LdapProvider(LdapServer):
         self.backends = self.get_backends()
         self.peers = self.get_peers()
 
-    def serverid_generator(self):
+    def serverids(self):
         with LdapReader(self.uri) as conn:
             result = conn.search_s('cn=config', ldap.SCOPE_BASE, attrlist=['olcServerID'])
-        return ( tuple(x.decode().split()) for x in result[0][1]['olcServerID'] )
+        return [ tuple(x.decode().split()) for x in result[0][1]['olcServerID'] ]
 
     def get_id(self):
-        g_serverids = self.serverid_generator()
-        (sid,uri) = next(g_serverids)
-        while uri != '' and self.host2uri(uri) != self.FQDN: (sid, uri) = next(g_serverids)
+        sid = [ s[0] for s in self.serverids() if len(s) == 1 or self.host2uri(s[1]) == self.FQDN ][0]
         return int(sid)
 
     def get_peers(self):
-        serverids = [ (sid, self.host2uri(uri)) for (sid, uri) in self.serverid_generator() ]
-        return set( [ host for (sid,host) in serverids if host != self.FQDN ] )
+        peers = [ self.host2uri(uri) for (sid, uri) in self.serverids() ]
+        return set(filter(lambda h: h != self.FQDN, peers))
 
     def get_csn(self, suffix):
         return super().get_csn(suffix,self.id)
