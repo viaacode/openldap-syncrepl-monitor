@@ -26,18 +26,12 @@ ldapservers = [
 
 suffixmonth = { 'dc=suffix1,dc=be': 5,'dc=suffix2,dc=be': 6 }
 
-olcServerID = list(map(lambda x: x.encode(),
-    [
-        f"{ldapservers[0]['id']} ldaps://{ldapservers[0]['hostname']}",
-        f"{ldapservers[1]['id']} ldaps://{ldapservers[1]['hostname']}",
-        f"{ldapservers[2]['id']} ldap://{ldapservers[2]['hostname']}"
-        ]
-    ))
-
-d = {
+@pytest.fixture
+def dit(olcserverid):
+    return {
         'cn=config': {
             'objectClass': [ b'olcGlobal'],
-            'olcServerID': olcServerID
+            'olcServerID': olcserverid
             },
         'olcDatabase={1}bdb,cn=config': {
             'objectClass': [ b'olcDatabaseConfig' ],
@@ -57,15 +51,26 @@ d = {
             }
         }
 
-@pytest.fixture(scope="module")
-def ldapmock():
-    myldap = MockLdap(d)
+@pytest.fixture
+def ldapmock(dit):
+    myldap = MockLdap(dit)
     myldap.start()
     yield myldap
     myldap.stop()
 
 
 class TestProvider:
+
+    @pytest.fixture
+    def olcserverid(self):
+        return list(map(lambda x: x.encode(),
+            [
+                f"{ldapservers[0]['id']} ldaps://{ldapservers[0]['hostname']}",
+                f"{ldapservers[1]['id']} ldaps://{ldapservers[1]['hostname']}",
+                f"{ldapservers[2]['id']} ldap://{ldapservers[2]['hostname']}"
+                ]
+            ))
+
 
     @pytest.fixture(params=ldapservers)
     def provider(self, mocker, ldapmock, request):
