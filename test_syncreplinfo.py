@@ -74,23 +74,23 @@ class TestProvider:
         self.year = request.param['year']
         mocker.patch.object(syncreplinfo.LdapServer,'FQDN', request.param['hostname'])
         return syncreplinfo.LdapProvider()
-    
+
     def test_id(self, provider):
         assert provider.id == self.id
-    
+
     def test_peers(self, provider):
         peers = provider.peers
-        assert type(peers) is set  
+        assert type(peers) is set
         assert self.master not in peers
         assert len(peers) == 2
-        assert len(list(filter(lambda x: re.match('master-\d+(\.example.com)?$', x), peers))) == 2
-    
+        assert len(list(filter(lambda x: re.match(r'master-\d+(\.example.com)?$', x), peers))) == 2
+
     def test_backends(self, provider):
         assert type(provider.backends) is list
         assert len(provider.backends) == 2
         assert 'dc=suffix1,dc=be' in provider.backends
         assert 'dc=suffix2,dc=be' in provider.backends
-    
+
     @pytest.mark.parametrize('suffix',suffixmonth.keys())
     def test_csn(self, provider, suffix):
         assert isinstance(provider.get_csn(suffix),datetime.datetime)

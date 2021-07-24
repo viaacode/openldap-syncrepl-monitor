@@ -43,11 +43,11 @@ class LdapServer:
 
     @staticmethod
     def host2uri(uri):
-       return re.match('ldap\w*://(\S*)', uri).group(1)
+       return re.match(r'ldap\w*://(\S*)', uri).group(1)
 
     @staticmethod
     def parse_csn(csn):
-        m = re.match('(?P<timestamp>\d+).\d+(?P<timezone>[\w:+-])*#\d+#(?P<sid>\d+)#\d+', csn)
+        m = re.match(r'(?P<timestamp>\d+).\d+(?P<timezone>[\w:+-])*#\d+#(?P<sid>\d+)#\d+', csn)
         # sid in contextCSN is hex
         return (int(m.group('sid'),16), m.group('timestamp') + m.group('timezone'))
 
