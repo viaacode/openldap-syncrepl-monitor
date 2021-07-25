@@ -60,10 +60,12 @@ class LdapProvider(LdapServer):
         self.peers = self.get_peers()
 
     # Returns the olcServerID attribute as a list of tuples (id, uri)
+    # Return an empty arry of olcServerID is not set.
     def serverids(self):
         with LdapReader(self.uri) as conn:
             result = conn.search_s('cn=config', ldap.SCOPE_BASE, attrlist=['olcServerID'])
-        return [ tuple(x.decode().split()) for x in result[0][1]['olcServerID'] ]
+            olcserverids = result[0][1].get('olcServerID') or []
+        return [ tuple(x.decode().split()) for x in olcserverids ]
 
     # Returns the id of the ldapserver on our host as an integer
     # olcServerID can have a value with or without uri:
@@ -71,14 +73,16 @@ class LdapProvider(LdapServer):
     #     attribute with uri == fqdn of the our host
     #   - without uri (len of the serverids tuple is 1): the current serverid
     #     is the value of the olcServerID attribute.
+    # Return None if serverids is empty
     def get_id(self):
         sid = [ s[0] for s in self.serverids() if len(s) == 1 or self.host2uri(s[1]) == self.FQDN ]
-        return int(sid[0])
+        return int(sid[0]) if len(sid) > 0 else None
 
     # If the uris in a multimaster setup are specified in the
     # olcServerID attribute, then get_peers returns the peers of our host as a set
+    # otherwise it returns an empty set
     def get_peers(self):
-        peers = [ self.host2uri(uri) for (sid, uri) in self.serverids() ]
+        peers = [ self.host2uri(t[1]) for t in self.serverids() if len(t) > 1 ]
         return set(filter(lambda h: h != self.FQDN, peers))
 
     # The provider's own csn
